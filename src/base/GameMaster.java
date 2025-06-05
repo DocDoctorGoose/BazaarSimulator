@@ -4,6 +4,7 @@ public class GameMaster {
     private Player player;
     private Double clock = 0.0;
     private double clockTick = .1;
+    public static GameClock gameClock = new GameClock();
 
 
     public GameMaster() {
@@ -11,9 +12,8 @@ public class GameMaster {
     }
 
     public void start() {
-        while(clock <= 30) {
-            clock += clockTick;
-            player.tick(clockTick);
+        while(gameClock.getCurrentTime() <= 30) {
+            gameClock.tick(clockTick);
         }
     }
 
