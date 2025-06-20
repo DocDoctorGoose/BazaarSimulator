@@ -1,25 +1,42 @@
 package base;
 
+import cards.listener.ICardTriggerListener;
+import utils.CardTags;
+
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
-public class Card {
+public abstract class Card {
+    private List<ICardTriggerListener> listeners = new ArrayList<>();
     public String name;
     public int size = 1;
-    public Set<String> tags = new HashSet<>();
+    public Set<CardTags> tags = new HashSet<>();
     public static double INTERNAL_COOLDOWN = .2;
     public Double cooldown;
     public Double time = 0.0;
     public int startingTier = 1;
     public int currentTier = 1;
     public int bonusValue = 0;
-    private boolean isHasted = false;
-    private boolean isSlowed = false;
-    private int triggerBacklog = 0;
-    private Board board;
+    protected boolean isHasted = false;
+    protected boolean isSlowed = false;
+    protected int triggerBacklog = 0;
+    protected Board board;
     public Integer position;
-    private GameClock gameClock = GameMaster.gameClock;
-    private double lastTriggerTime = 0;
+    protected GameClock gameClock = GameMaster.gameClock;
+    protected double lastTriggerTime = 0;
+    protected Integer damage;
+    protected Integer shield;
+    protected Integer poison;
+    protected Integer burn;
+    protected Integer regeneration;
+    protected Double critChance = 0.0;
+    public int critMultiplier = 1;
+
+    public Card() {
+        //Make sure to set the board and position before using.
+    }
 
     public Card(Board board, int position) {
         this.board = board;
@@ -29,10 +46,12 @@ public class Card {
     /**
      * Push the card forward in time. Assuming it is less than the internal cooldown
      * @param clockTick Time to add.
-     * @return True if the card hit its cooldown.
      */
-    public boolean incrementTime(double clockTick) {
-        boolean isTriggered = false;
+    public void incrementTime(double clockTick) {
+        if(cooldown == null) {
+            return;
+        }
+
         double timeDelta = clockTick;
         timeDelta = isHasted ? timeDelta * 2 : timeDelta;
         timeDelta = isSlowed ? timeDelta / 2 : timeDelta;
@@ -40,20 +59,22 @@ public class Card {
 
         if(time >= cooldown) {
             time = 0.0;
-            isTriggered = true;
             addTrigger(1);
         }
 
         if(triggerBacklog > 0) {
             resolveTriggerBacklog();
         }
-        return isTriggered;
+    }
+
+    public void initialize() {
+        //Typically do nothing unless you need to listen to other card's triggers.
     }
 
     private void resolveTriggerBacklog() {
         double currentTime = gameClock.getCurrentTime();
         if((currentTime - lastTriggerTime) >= INTERNAL_COOLDOWN) {
-            trigger();
+            addTriggerToBoardStack();
             lastTriggerTime = currentTime;
             triggerBacklog--;
         }
@@ -63,13 +84,31 @@ public class Card {
         triggerBacklog += triggerAmount;
     }
 
-    private void trigger() {
-        //Add a function to the Board's stack that is this card's action. Allow the Board
-        // to handle the resolution of multiple triggers happening on the same tick.
+    protected void addTriggerToBoardStack() {
+        board.addToStack(this);
     }
 
     public int getValue() {
         return 2 * currentTier * size + bonusValue;
     }
 
+    public void setBoard(Board board, int position) {
+        this.board = board;
+        this.position = position;
+    }
+
+    protected boolean checkCrit() {
+        return critChance > GameMaster.rand.nextDouble();
+    }
+
+    public void trigger() {
+        cardAction();
+        listeners.forEach(listener -> listener.cardTriggered(this));
+    }
+
+    public void addListener(ICardTriggerListener listener) {
+        listeners.add(listener);
+    }
+
+    protected abstract void cardAction();
 }
